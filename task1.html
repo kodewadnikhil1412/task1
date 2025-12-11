@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Fitness & Nutrition Tracker — Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* ---------- Reset & base ---------- */
+    *{box-sizing:border-box;margin:0;padding:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    :root{
+      --bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--glass:rgba(255,255,255,0.03);
+      --success:#16a34a;--danger:#ef4444;--soft:#111827;
+    }
+    html,body{height:100%;background:linear-gradient(180deg,#071029 0%, #061022 60%);color:#dbeafe}
+    .app{display:grid;grid-template-columns:260px 1fr;gap:20px;min-height:100vh;padding:28px}
+
+    /* ---------- Sidebar ---------- */
+    .sidebar{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:14px;padding:18px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .brand{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+    .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700}
+    .brand h1{font-size:16px}
+    .nav{margin-top:10px}
+    .nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border-radius:10px;background:transparent;border:0;color:var(--muted);cursor:pointer}
+    .nav button.active{background:linear-gradient(90deg,rgba(6,182,212,0.08),rgba(124,58,237,0.06));color:var(--accent)}
+
+    /* ---------- Main ---------- */
+    .main{padding:18px;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));box-shadow:0 6px 30px rgba(2,6,23,0.6)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    .search{display:flex;gap:10px;align-items:center}
+    .search input{background:var(--glass);border:1px solid rgba(255,255,255,0.04);padding:10px 12px;border-radius:10px;color:#e6eef8;width:260px}
+    .profile{display:flex;gap:12px;align-items:center}
+    .avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f97316,#f43f5e);display:flex;align-items:center;justify-content:center}
+
+    /* ---------- Stats cards ---------- */
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.02)}
+    .card h3{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .card .value{font-size:20px;font-weight:700}
+
+    /* ---------- Layout: left column (forms) + right column (charts) ---------- */
+    .split{display:grid;grid-template-columns:360px 1fr;gap:16px}
+    .panel{background:var(--card);padding:14px;border-radius:12px}
+    form.row{display:flex;gap:10px;flex-wrap:wrap}
+    input,select{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:8px;color:#e6eef8}
+    .btn{padding:9px 12px;border-radius:8px;border:0;cursor:pointer;background:var(--accent);color:#042027}
+    .muted{color:var(--muted);font-size:13px}
+
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03);font-size:14px}
+
+    /* Responsive */
+    @media(max-width:940px){.app{grid-template-columns:1fr}.split{grid-template-columns:1fr}.grid{grid-template-columns:repeat(1,1fr)}.search input{width:140px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="logo">FT</div><div><h1>FitTrack</h1><div class="muted">Fitness & Nutrition</div></div></div>
+      <nav class="nav">
+        <button class="active" data-section="dashboard">Dashboard</button>
+        <button data-section="workouts">Workouts</button>
+        <button data-section="meals">Meals</button>
+        <button data-section="history">History</button>
+        <button data-section="settings">Settings</button>
+      </nav>
+      <div style="margin-top:18px" class="muted">Tip: data saved to your browser (localStorage)</div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="search"><input id="search" placeholder="Search activities or meals..." /></div>
+        <div class="profile"><div class="muted">Welcome, User</div><div class="avatar">U</div></div>
+      </div>
+
+      <section class="grid">
+        <div class="card">
+          <h3>Today Calories</h3>
+          <div class="value" id="todayCalories">0 kcal</div>
+          <div class="muted">Goal: <span id="calorieGoal">2000</span> kcal</div>
+        </div>
+        <div class="card">
+          <h3>Workouts (this week)</h3>
+          <div class="value" id="workoutCount">0</div>
+          <div class="muted">Minutes: <span id="workoutMinutes">0</span></div>
+        </div>
+        <div class="card">
+          <h3>Weight</h3>
+          <div class="value" id="weightDisplay">-- kg</div>
+          <div class="muted">Track progress weekly</div>
+        </div>
+      </section>
+
+      <section class="split">
+        <div>
+          <div class="panel" id="workoutPanel">
+            <h3>Add Workout</h3>
+            <form id="workoutForm" class="row">
+              <input placeholder="Name (e.g. Running)" id="w-name" required />
+              <input type="number" placeholder="Minutes" id="w-minutes" required />
+              <input type="number" placeholder="Calories burned" id="w-cal" required />
+              <button class="btn" type="submit">Add</button>
+            </form>
+            <table id="workoutTable"><thead><tr><th>Name</th><th>Min</th><th>Calories</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+
+          <div class="panel" id="mealPanel" style="margin-top:12px">
+            <h3>Add Meal</h3>
+            <form id="mealForm" class="row">
+              <input placeholder="Meal name" id="m-name" required />
+              <input type="number" placeholder="Calories" id="m-cal" required />
+              <input type="number" placeholder="Protein (g)" id="m-pro" required />
+              <input type="number" placeholder="Carbs (g)" id="m-carb" required />
+              <input type="number" placeholder="Fat (g)" id="m-fat" required />
+              <button class="btn" type="submit">Add Meal</button>
+            </form>
+            <table id="mealTable"><thead><tr><th>Meal</th><th>Cal</th><th>P</th><th>C</th><th>F</th><th></th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <h3>Charts</h3>
+            <canvas id="calChart" height="120"></canvas>
+            <div style="height:12px"></div>
+            <canvas id="macroChart" height="120"></canvas>
+          </div>
+
+          <div class="panel" style="margin-top:12px">
+            <h3>Activity History</h3>
+            <div class="muted">Recent workouts & meals</div>
+            <div id="historyList" style="margin-top:8px"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    /* ---------- Data model & persistence ---------- */
+    const STORAGE_KEY = 'fittrack_v1';
+    const defaultState = {
+      calorieGoal:2000,
+      weight:null,
+      workouts:[], // {id,name,minutes,calories,date}
+      meals:[] // {id,name,calories,protein,carbs,fat,date}
+    };
+
+    function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+
+    function load(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw?JSON.parse(raw):JSON.parse(JSON.stringify(defaultState));
+      }catch(e){console.error(e);return JSON.parse(JSON.stringify(defaultState));}
+    }
+    function save(state){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
+
+    let state = load();
+
+    /* ---------- UI helpers ---------- */
+    const $ = sel=>document.querySelector(sel);
+    const $all = sel=>document.querySelectorAll(sel);
+
+    function formatNum(n){return Number(n).toLocaleString();}
+
+    /* ---------- Render functions ---------- */
+    function renderStats(){
+      const today = new Date().toISOString().slice(0,10);
+      const mealsToday = state.meals.filter(m=>m.date===today);
+      const workoutsToday = state.workouts.filter(w=>w.date===today);
+      const calFromMeals = mealsToday.reduce((s,m)=>s+m.calories,0);
+      const calBurned = workoutsToday.reduce((s,w)=>s+w.calories,0);
+      const net = calFromMeals - calBurned;
+      $('#todayCalories').textContent = formatNum(net) + ' kcal';
+      $('#calorieGoal').textContent = state.calorieGoal;
+      $('#workoutCount').textContent = state.workouts.filter(w=>isThisWeek(new Date(w.date))).length;
+      $('#workoutMinutes').textContent = state.workouts.reduce((s,w)=>s+w.minutes,0);
+      $('#weightDisplay').textContent = state.weight? state.weight + ' kg' : '-- kg';
+    }
+
+    function isThisWeek(d){
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      return d>=start;
+    }
+
+    function renderTables(){
+      const wT = $('#workoutTable tbody'); wT.innerHTML='';
+      state.workouts.slice().reverse().forEach(w=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${escapeHtml(w.name)}</td><td>${w.minutes}</td><td>${w.calories}</td><td><button data-id="${w.id}" class="del-w">Del</button></td>`;
+        wT.appendChild(tr);
+      });
+
+      const mT = $('#mealTable tbody'); mT.innerHTML='';
+      state.meals.slice().reverse().forEach(m=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${escapeHtml(m.name)}</td><td>${m.calories}</td><td>${m.protein}</td><td>${m.carbs}</td><td>${m.fat}</td><td><button data-id="${m.id}" class="del-m">Del</button></td>`;
+        mT.appendChild(tr);
+      });
+    }
+
+    function renderHistory(){
+      const list = $('#historyList'); list.innerHTML='';
+      const merged = [...state.workouts.map(w=>({type:'workout',...w})), ...state.meals.map(m=>({type:'meal',...m}))];
+      merged.sort((a,b)=> new Date(b.date) - new Date(a.date));
+      merged.slice(0,8).forEach(item=>{
+        const d = document.createElement('div'); d.style.padding='8px'; d.style.borderBottom='1px dashed rgba(255,255,255,0.03)';
+        if(item.type==='workout') d.innerHTML = `<strong>${escapeHtml(item.name)}</strong> — ${item.minutes} min • ${item.calories} kcal <div class="muted">${item.date}</div>`;
+        else d.innerHTML = `<strong>${escapeHtml(item.name)}</strong> — ${item.calories} kcal • P ${item.protein}g C ${item.carbs}g F ${item.fat}g <div class="muted">${item.date}</div>`;
+        list.appendChild(d);
+      });
+    }
+
+    function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+    /* ---------- Charts ---------- */
+    let calChart, macroChart;
+    function initCharts(){
+      const calCtx = document.getElementById('calChart').getContext('2d');
+      calChart = new Chart(calCtx,{
+        type:'line',
+        data:{labels:[],datasets:[{label:'Net Calories',data:[],fill:true,tension:0.3}]},
+        options:{responsive:true,plugins:{legend:{display:false}}}
+      });
+
+      const macroCtx = document.getElementById('macroChart').getContext('2d');
+      macroChart = new Chart(macroCtx,{
+        type:'doughnut',
+        data:{labels:['Protein','Carbs','Fat'],datasets:[{data:[0,0,0]}]},
+        options:{responsive:true,plugins:{legend:{position:'bottom'}}}
+      });
+
+      updateCharts();
+    }
+
+    function updateCharts(){
+      // calories by last 7 days (net)
+      const days = [];
+      for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+      const data = days.map(day=>{
+        const meals = state.meals.filter(m=>m.date===day).reduce((s,m)=>s+m.calories,0);
+        const burns = state.workouts.filter(w=>w.date===day).reduce((s,w)=>s+w.calories,0);
+        return meals - burns;
+      });
+      calChart.data.labels = days.map(d=>d.slice(5));
+      calChart.data.datasets[0].data = data;
+      calChart.update();
+
+      // macros - totals for today
+      const today = new Date().toISOString().slice(0,10);
+      const totals = state.meals.filter(m=>m.date===today).reduce((acc,m)=>{acc.p+=m.protein;acc.c+=m.carbs;acc.f+=m.fat;return acc},{p:0,c:0,f:0});
+      macroChart.data.datasets[0].data = [totals.p, totals.c, totals.f];
+      macroChart.update();
+    }
+
+    /* ---------- Event handlers ---------- */
+    document.getElementById('workoutForm').addEventListener('submit',e=>{
+      e.preventDefault();
+      const name=$('#w-name').value.trim(); const minutes=Number($('#w-minutes').value); const calories=Number($('#w-cal').value);
+      if(!name||!minutes) return;
+      const obj={id:uid(),name,minutes,calories,date:new Date().toISOString().slice(0,10)};
+      state.workouts.push(obj); save(state); renderAll();
+      e.target.reset();
+    });
+
+    document.getElementById('mealForm').addEventListener('submit',e=>{
+      e.preventDefault();
+      const name=$('#m-name').value.trim(); const calories=Number($('#m-cal').value); const protein=Number($('#m-pro').value); const carbs=Number($('#m-carb').value); const fat=Number($('#m-fat').value);
+      if(!name||!calories) return;
+      const obj={id:uid(),name,calories,protein,carbs,fat,date:new Date().toISOString().slice(0,10)};
+      state.meals.push(obj); save(state); renderAll();
+      e.target.reset();
+    });
+
+    // delete handlers using event delegation
+    document.addEventListener('click',e=>{
+      if(e.target.classList.contains('del-w')){
+        const id = e.target.dataset.id; state.workouts = state.workouts.filter(w=>w.id!==id); save(state); renderAll();
+      }
+      if(e.target.classList.contains('del-m')){
+        const id = e.target.dataset.id; state.meals = state.meals.filter(m=>m.id!==id); save(state); renderAll();
+      }
+    });
+
+    // nav
+    document.querySelectorAll('.nav button').forEach(btn=>btn.addEventListener('click',e=>{
+      document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active')); e.currentTarget.classList.add('active');
+      const section = btn.getAttribute('data-section'); // currently simple demo - could scroll to a section
+    }));
+
+    // search
+    $('#search').addEventListener('input',e=>{
+      const q = e.target.value.toLowerCase();
+      // filter history display
+      const merged = [...state.workouts.map(w=>({type:'workout',...w})), ...state.meals.map(m=>({type:'meal',...m}))];
+      const filtered = merged.filter(it=>it.name.toLowerCase().includes(q));
+      const list = $('#historyList'); list.innerHTML='';
+      filtered.slice(0,12).forEach(item=>{
+        const d = document.createElement('div'); d.style.padding='8px'; d.style.borderBottom='1px dashed rgba(255,255,255,0.03)';
+        if(item.type==='workout') d.innerHTML = `<strong>${escapeHtml(item.name)}</strong> — ${item.minutes} min • ${item.calories} kcal <div class="muted">${item.date}</div>`;
+        else d.innerHTML = `<strong>${escapeHtml(item.name)}</strong> — ${item.calories} kcal • P ${item.protein}g C ${item.carbs}g F ${item.fat}g <div class="muted">${item.date}</div>`;
+        list.appendChild(d);
+      });
+      if(q==='') renderHistory();
+    });
+
+    /* ---------- Initialize ---------- */
+    function renderAll(){ renderStats(); renderTables(); renderHistory(); updateCharts(); }
+
+    // add sample data if empty (to make charts visible)
+    if(state.meals.length===0 && state.workouts.length===0){
+      const today = new Date();
+      for(let i=0;i<5;i++){
+        const d = new Date(); d.setDate(today.getDate()-i);
+        state.meals.push({id:uid(),name:['Breakfast','Lunch','Dinner','Snack','Shake'][i%5],calories:300+Math.floor(Math.random()*400),protein:10+Math.floor(Math.random()*30),carbs:30+Math.floor(Math.random()*60),fat:5+Math.floor(Math.random()*20),date:d.toISOString().slice(0,10)});
+        state.workouts.push({id:uid(),name:['Run','Cycle','Swim','Gym','Yoga'][i%5],minutes:20+Math.floor(Math.random()*40),calories:100+Math.floor(Math.random()*300),date:d.toISOString().slice(0,10)});
+      }
+      save(state);
+    }
+
+    initCharts(); renderAll();
+
+    // small UI: allow changing calorie goal by clicking value
+    $('#calorieGoal').parentElement.addEventListener('click',()=>{
+      const g = prompt('Set daily calorie goal (kcal):', state.calorieGoal);
+      if(g && !isNaN(Number(g))){state.calorieGoal = Number(g); save(state); renderStats();}
+    });
+
+    // Export & import (simple)
+    window.addEventListener('keydown',e=>{
+      if(e.ctrlKey && e.key==='e'){
+        const data = JSON.stringify(state, null, 2); const blob=new Blob([data],{type:'application/json'}); const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url; a.download='fittrack-export.json'; a.click(); URL.revokeObjectURL(url);
+      }
+    });
+
+    // done
+  </script>
+</body>
+</html>
